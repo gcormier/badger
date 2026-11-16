@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Badge Holder Inlay</title>
+  <meta name="description" content="Rebuild the gen1 ID card + YubiKey badge holder from parameters, inlay a logo into the bed face, and export a two-part 3MF." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='1' width='10' height='14' rx='1.5' fill='%23C92A28'/%3E%3Crect x='5' y='5' width='6' height='6' fill='%23fff'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="app">
+    <aside class="panel">
+      <header>
+        <h1>Badge Holder Inlay</h1>
+        <p class="sub">gen1 · ID card + YubiKey · bed-face logo · 3MF</p>
+      </header>
+
+      <section>
+        <h2>Logo</h2>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp" />
+          <span id="drop-text">Drop an SVG or PNG here, or click to choose</span>
+        </label>
+        <div class="row small" id="source-row" hidden>
+          <span id="source-name"></span>
+          <button type="button" id="clear-logo" class="link">Remove</button>
+        </div>
+        <div id="raster-controls" hidden>
+          <div class="field">
+            <label for="threshold">Threshold <span id="threshold-val" class="muted"></span></label>
+            <div class="row">
+              <input type="range" id="threshold" min="1" max="254" value="128" />
+              <label class="check"><input type="checkbox" id="threshold-auto" checked /> auto</label>
+            </div>
+          </div>
+          <canvas id="raster-preview" class="raster-preview"></canvas>
+        </div>
+        <label class="check"><input type="checkbox" id="invert" /> Invert (light parts become the logo)</label>
+        <div id="fields-logo"></div>
+        <div class="field">
+          <label>Thin features</label>
+          <select id="thin_mode">
+            <option value="keep_tips">Keep sharp tips on large islands</option>
+            <option value="strict">Strict opening (remove everything thinner)</option>
+          </select>
+        </div>
+      </section>
+
+      <section>
+        <h2>Colours</h2>
+        <div class="row colors">
+          <label class="color"><input type="color" id="case_color" /> Case <span class="muted">(extruder 1)</span></label>
+          <label class="color"><input type="color" id="logo_color" /> Logo <span class="muted">(extruder 2)</span></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Case</h2>
+        <div id="fields-case"></div>
+        <details>
+          <summary>Advanced</summary>
+          <div id="fields-advanced"></div>
+          <button type="button" id="reset" class="link">Reset all to defaults</button>
+        </details>
+      </section>
+
+      <section class="export">
+        <button type="button" id="download" class="primary" disabled>Download 3MF</button>
+        <ul id="warnings" class="warnings"></ul>
+        <dl id="stats" class="stats"></dl>
+      </section>
+    </aside>
+
+    <main class="view">
+      <div id="viewer" class="viewer"></div>
+      <div class="toolbar">
+        <button type="button" data-view="bottom" class="on">Bottom</button>
+        <button type="button" data-view="top">Top</button>
+        <button type="button" data-view="iso">3D</button>
+        <label class="check"><input type="checkbox" id="overlay" checked /> Overlays</label>
+      </div>
+      <div class="legend">
+        <span><i class="sw allowed"></i>logo area</span>
+        <span><i class="sw removed"></i>removed (too thin/small)</span>
+        <span><i class="sw clipped"></i>clipped by keep-out</span>
+      </div>
+      <div id="busy" class="busy" hidden>Building…</div>
+    </main>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
