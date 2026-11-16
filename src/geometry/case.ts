@@ -33,16 +33,22 @@ export function buildCase(w: ManifoldToplevel, p: CaseParams, s: Scope): Manifol
   const keyreg = s.k(outline.intersect(rect2(w, s, 0, 0, W, d.key_sec)));
   body = s.k(body.add(s.k(keyreg.extrude(d.T_key))));
 
-  // Card window with 45° dovetail undercut: edges move inward by (z - skin).
-  const win = (z: number): [number, number, number][] => {
-    const dz = z - sk;
-    const x1 = W - p.side + p.card_t - dz;
-    const y0 = d.key_sec - p.card_t + dz;
-    const y1 = d.key_sec + d.card_ph + p.card_t - dz;
+  // Card pocket: vertical walls (card size + clearance, pushed out by dove_o) up to
+  // dove_z, then a 45° dovetail lip to the top: edges move inward by (z − dove_z).
+  // With dove_h ≥ full height this is the original full-height dovetail.
+  const o = d.dove_o, zs = d.dove_z;
+  const rectAt = (z: number, off: number): [number, number, number][] => {
+    const x1 = W - p.side + off, y0 = d.key_sec - off, y1 = d.key_sec + d.card_ph + off;
     return [[-5, y0, z], [x1, y0, z], [x1, y1, z], [-5, y1, z]];
   };
-  const dove = s.k(Manifold.hull([...win(sk), ...win(d.T_card + E)]));
+  if (zs > sk + 1e-6) body = s.k(body.subtract(box(w, s, -5, d.key_sec - o, sk, W - p.side + o, d.key_sec + d.card_ph + o, zs + E)));
+  const zt = d.T_card + E;
+  const dove = s.k(Manifold.hull([...rectAt(zs, o), ...rectAt(zt, o - (zt - zs))]));
   body = s.k(body.subtract(dove));
+  // Lip relief near the entry: no lips here, so a whole stack can bow up over the ridges.
+  if (p.relief_len > 0) {
+    body = s.k(body.subtract(box(w, s, -5, d.key_sec - o, sk, d.entry + p.relief_len, d.key_sec + d.card_ph + o, d.T_card + 1)));
+  }
 
   // Key pocket, open at the +x end.
   const x0k = W - d.key_pl, y0k = p.side, y1k = p.side + d.key_ph;
@@ -66,10 +72,10 @@ export function buildCase(w: ManifoldToplevel, p: CaseParams, s: Scope): Manifol
   }
 
   // Card detent ridges (triangular prisms). CCW winding matters.
-  const x0 = d.entry - d.ridge_lead - d.ridge_catch + 0.1;
+  const x0 = d.entry - d.ridge_lead - d.ridge_catch - p.ridge_gap;
   for (const c of ridgeCentres(p, d)) {
     const tri = s.k(new CrossSection([[
-      [x0, sk - E], [x0 + d.ridge_lead + d.ridge_catch, sk - E], [x0 + d.ridge_lead, sk + p.ridge_h],
+      [x0, sk - E], [x0 + d.ridge_lead + d.ridge_catch, sk - E], [x0 + d.ridge_lead, sk + d.ridge_h],
     ]]));
     const pr = s.k(s.k(s.k(tri.extrude(p.ridge_len)).rotate([90, 0, 0])).translate([0, c + p.ridge_len / 2, 0]));
     body = s.k(body.add(pr));

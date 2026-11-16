@@ -38,6 +38,14 @@ Pushing to the default branch runs `.github/workflows/pages.yml`, which tests, b
 
 Geometry is [manifold-3d](https://github.com/elalish/manifold) (WASM), so both meshes are guaranteed manifold.
 
+### Card retention
+
+- **Stack**: thickness in mm, or *number of cards × average card* (default 0.80 mm).
+- **Pocket**: vertical walls at card size + `card_clr`, so the back cards can't move. Above the front card there's a 45° dovetail lip `dove_h` tall (1.5 mm = `card_tclr` + `skin`). Its narrowest allowed point is the front card's top face. If `dove_h` reaches below that face, the walls move out to match, and at full height you get the original full dovetail.
+- **Ridges**: height = stack − one card + `ridge_engage` (0.4 mm), so they catch the **front** card's trailing edge, not just the back ones. The lead-in is 45° (`ridge_ramp`) and the catch face is vertical (`ridge_catch_deg`) with a 0.1 mm gap (`ridge_gap`), so every card in the stack has the same hold.
+- **Entry relief**: for `relief_len` mm past the seated card edge, the lips are removed so a whole stack can bow up over the ridges.
+- `LEGACY_RETENTION` in `src/params.ts` reproduces the original Fusion design (full dovetail, fixed 1.4 mm ridges, 30°/60°, 0.1 mm preload). The Fusion-comparison tests use it.
+
 ### Thin-feature handling
 
 `min_feature` runs a morphological opening (erode then dilate by `min_feature/2`). Two modes:

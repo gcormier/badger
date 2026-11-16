@@ -1,7 +1,12 @@
 // Parameters for the gen1 badge holder. Values mirror the Fusion 360 model.
 
 export interface CaseParams {
+  /** 'mm': card_t is the stack thickness; 'count': card_count × card_unit */
+  card_mode: 'mm' | 'count';
   card_t: number;
+  card_count: number;
+  /** average thickness of one card (count mode, and ridge sizing) */
+  card_unit: number;
   card_w: number;
   card_h: number;
   card_clr: number;
@@ -23,7 +28,22 @@ export interface CaseParams {
   flex_gap: number;
   bump_d: number;
   bump_h: number;
+  /** auto: ridge height follows the stack so it catches the front card */
+  ridge_auto: boolean;
+  /** manual ridge height (when ridge_auto is off) */
   ridge_h: number;
+  /** how far the ridge stands above the front card's bottom face (auto mode) */
+  ridge_engage: number;
+  /** lead-in ramp angle from horizontal, degrees */
+  ridge_ramp: number;
+  /** catch (retention) face angle from horizontal, degrees */
+  ridge_catch_deg: number;
+  /** gap from the catch-face foot to the seated card edge (negative = preload) */
+  ridge_gap: number;
+  /** height of the 45° dovetail lip, measured down from the top face */
+  dove_h: number;
+  /** length past the seated card edge where the lips are removed so a stack can bow up over the ridge (0 = off) */
+  relief_len: number;
   ridge_len: number;
   notch_r: number;
   key_win: number;
@@ -56,7 +76,10 @@ export interface LogoParams {
 export type Params = CaseParams & LogoParams;
 
 export const DEFAULT_CASE: CaseParams = {
+  card_mode: 'mm',
   card_t: 2.76,
+  card_count: 3,
+  card_unit: 0.8,
   card_w: 53.98,
   card_h: 85.6,
   card_clr: 0.2,
@@ -78,7 +101,14 @@ export const DEFAULT_CASE: CaseParams = {
   flex_gap: 0.6,
   bump_d: 3.8,
   bump_h: 1.2,
+  ridge_auto: true,
   ridge_h: 1.4,
+  ridge_engage: 0.4,
+  ridge_ramp: 45,
+  ridge_catch_deg: 90,
+  ridge_gap: 0.1,
+  dove_h: 1.5,
+  relief_len: 15,
   ridge_len: 13,
   notch_r: 7,
   key_win: 12,
@@ -107,7 +137,22 @@ export const DEFAULT_LOGO: LogoParams = {
 
 export const DEFAULTS: Params = { ...DEFAULT_CASE, ...DEFAULT_LOGO };
 
+/** The original Fusion gen1 card retention (full-height dovetail, fixed 1.4 mm ridges). */
+export const LEGACY_RETENTION: Partial<CaseParams> = {
+  card_mode: 'mm', ridge_auto: false, ridge_h: 1.4, ridge_ramp: 30, ridge_catch_deg: 60, ridge_gap: -0.1, dove_h: 99, relief_len: 0,
+};
+
 export interface Derived {
+  /** effective card stack thickness */
+  card_t: number;
+  /** effective ridge height */
+  ridge_h: number;
+  /** z of the front (top) card's top face */
+  z_front: number;
+  /** z where the dovetail slope starts */
+  dove_z: number;
+  /** how far the vertical pocket wall sits outside the card edge (0 = tight) */
+  dove_o: number;
   card_gap: number;
   key_gap: number;
   T_card: number;
@@ -129,16 +174,31 @@ export interface Derived {
   logo_cy: number;
 }
 
-const T30 = Math.tan(Math.PI / 6);
+const tand = (deg: number) => Math.tan((deg * Math.PI) / 180);
+
+export function cardStack(p: CaseParams): number {
+  return p.card_mode === 'count' ? p.card_count * p.card_unit : p.card_t;
+}
 
 export function derive(p: CaseParams): Derived {
-  const card_gap = p.card_t + p.card_tclr;
+  const card_t = cardStack(p);
+  const card_gap = card_t + p.card_tclr;
   const key_gap = p.key_t + p.key_tclr;
   const T_card = 2 * p.skin + card_gap;
   const T_key = 2 * p.skin + key_gap;
-  const ridge_lead = p.ridge_h / T30;
-  const ridge_catch = p.ridge_h * T30;
-  const entry = ridge_lead + ridge_catch + 0.6;
+  // Ridge: catch the front card by ridge_engage (it sits card_t − one card above the floor).
+  const ridge_h = p.ridge_auto ? Math.max(0.2, card_t - p.card_unit + p.ridge_engage) : p.ridge_h;
+  const ridge_lead = ridge_h / tand(p.ridge_ramp);
+  const ridge_catch = p.ridge_catch_deg >= 89.999 ? 0 : ridge_h / tand(p.ridge_catch_deg);
+  // Pocket: vertical walls, then a 45° lip over the top dove_h. The lip's narrowest
+  // allowed point is the front card's top face, so the vertical wall is pushed out
+  // only if the slope must start below it.
+  const z_front = p.skin + card_t;
+  const lipRoom = T_card - z_front; // = card_tclr + skin
+  const dh = Math.min(Math.max(p.dove_h, 0), T_card - p.skin);
+  const dove_z = T_card - dh;
+  const dove_o = Math.max(0, dh - lipRoom);
+  const entry = Math.max(ridge_lead + ridge_catch + 0.6, ridge_lead + ridge_catch + p.ridge_gap + 0.5);
   const body_w = entry + p.card_w + p.card_clr + p.side;
   const key_ph = p.key_w + p.key_clr;
   const key_sec = 2 * p.side + key_ph;
@@ -153,6 +213,7 @@ export function derive(p: CaseParams): Derived {
   const logo_cx = body_w / 2;
   const logo_cy = (key_sec + (body_h - p.top_band / 2 - p.slot_h / 2)) / 2;
   return {
+    card_t, ridge_h, z_front, dove_z, dove_o,
     card_gap, key_gap, T_card, T_key, ridge_lead, ridge_catch, entry, body_w,
     key_ph, key_sec, card_ph, body_h, key_pl, ring_x, key_cy, card_cy, logo_cx, logo_cy,
   };
@@ -168,14 +229,24 @@ export interface FieldMeta {
   max?: number;
   star?: boolean;
   group: 'case' | 'logo';
+  /** only shown in this card mode */
+  mode?: 'mm' | 'count';
   help?: string;
 }
 
 export const FIELDS: FieldMeta[] = [
-  { key: 'card_t', label: 'Card stack thickness', unit: 'mm', step: 0.01, min: 0.5, max: 6, star: true, group: 'case', help: '1 ID-1 card ≈ 0.76' },
+  { key: 'card_t', label: 'Card stack thickness', unit: 'mm', step: 0.01, min: 0.5, max: 8, star: true, group: 'case', mode: 'mm' },
+  { key: 'card_count', label: 'Number of cards', step: 1, min: 1, max: 10, star: true, group: 'case', mode: 'count' },
+  { key: 'card_unit', label: 'Avg card thickness', unit: 'mm', step: 0.01, min: 0.3, max: 1.5, star: true, group: 'case', help: 'ISO 0.76; real cards ≈ 0.78–0.84' },
   { key: 'key_t', label: 'Key thickness', unit: 'mm', step: 0.05, min: 1, max: 8, star: true, group: 'case' },
   { key: 'bump_h', label: 'Detent bump height', unit: 'mm', step: 0.05, min: 0, max: 3, star: true, group: 'case' },
-  { key: 'ridge_h', label: 'Card ridge height', unit: 'mm', step: 0.05, min: 0.2, max: 3, star: true, group: 'case' },
+  { key: 'ridge_engage', label: 'Ridge catch on front card', unit: 'mm', step: 0.05, min: 0, max: 1.5, star: true, group: 'case', help: 'ridge height = stack − 1 card + this' },
+  { key: 'ridge_h', label: 'Manual ridge height', unit: 'mm', step: 0.05, min: 0.2, max: 6, group: 'case', help: 'used when auto ridge is off' },
+  { key: 'ridge_ramp', label: 'Ridge lead-in angle', unit: '°', step: 5, min: 15, max: 70, group: 'case' },
+  { key: 'ridge_catch_deg', label: 'Ridge catch-face angle', unit: '°', step: 5, min: 30, max: 90, group: 'case', help: '90 = vertical' },
+  { key: 'ridge_gap', label: 'Ridge gap to card', unit: 'mm', step: 0.05, min: -0.5, max: 1, group: 'case', help: 'negative = preload' },
+  { key: 'dove_h', label: 'Dovetail lip height', unit: 'mm', step: 0.1, min: 0, max: 10, star: true, group: 'case', help: 'top part only; walls below are vertical' },
+  { key: 'relief_len', label: 'Lip relief at entry', unit: 'mm', step: 1, min: 0, max: 40, star: true, group: 'case', help: 'lets a stack bow up over the ridge; 0 = off' },
   { key: 'key_win', label: 'Key-end window', unit: 'mm', step: 0.5, min: 0, max: 40, star: true, group: 'case' },
   { key: 'grip_l', label: 'Pinch window length', unit: 'mm', step: 0.5, min: 0, max: 30, star: true, group: 'case' },
   { key: 'card_w', label: 'Card width', unit: 'mm', step: 0.01, group: 'case' },

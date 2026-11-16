@@ -56,7 +56,15 @@
 
       <section>
         <h2>Case</h2>
+        <div class="field">
+          <label for="card_mode">Card stack</label>
+          <select id="card_mode">
+            <option value="mm">Thickness (mm)</option>
+            <option value="count">Number of cards</option>
+          </select>
+        </div>
         <div id="fields-case"></div>
+        <label class="check"><input type="checkbox" id="ridge_auto" /> Ridge height follows stack (catches front card)</label>
         <details>
           <summary>Advanced</summary>
           <div id="fields-advanced"></div>

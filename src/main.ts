@@ -103,10 +103,13 @@ function renderForm() {
   const logo = $('fields-logo'), cs = $('fields-case'), adv = $('fields-advanced');
   logo.innerHTML = cs.innerHTML = adv.innerHTML = '';
   for (const f of FIELDS) {
+    if (f.mode && f.mode !== params.card_mode) continue;
     const el = fieldEl(f);
     if (f.group === 'logo') (f.star ? logo : adv).appendChild(el);
     else (f.star ? cs : adv).appendChild(el);
   }
+  $<HTMLSelectElement>('card_mode').value = params.card_mode;
+  $<HTMLInputElement>('ridge_auto').checked = params.ridge_auto;
   $<HTMLInputElement>('invert').checked = params.invert;
   $<HTMLSelectElement>('thin_mode').value = params.thin_mode;
   $<HTMLInputElement>('case_color').value = params.case_color;
@@ -119,6 +122,19 @@ renderForm();
 $<HTMLInputElement>('invert').addEventListener('change', (e) => {
   params.invert = (e.target as HTMLInputElement).checked;
   saveParams(); updateRasterPreview(); rebuild();
+});
+$<HTMLSelectElement>('card_mode').addEventListener('change', (e) => {
+  const mode = (e.target as HTMLSelectElement).value as Params['card_mode'];
+  // carry the current stack over so switching modes doesn't jump
+  const d = derive(params);
+  if (mode === 'count') params.card_count = Math.max(1, Math.round(d.card_t / params.card_unit));
+  else params.card_t = Math.round(d.card_t * 100) / 100;
+  params.card_mode = mode;
+  saveParams(); renderForm(); rebuild();
+});
+$<HTMLInputElement>('ridge_auto').addEventListener('change', (e) => {
+  params.ridge_auto = (e.target as HTMLInputElement).checked;
+  saveParams(); rebuild();
 });
 $<HTMLSelectElement>('thin_mode').addEventListener('change', (e) => {
   params.thin_mode = (e.target as HTMLSelectElement).value as Params['thin_mode'];
@@ -239,7 +255,9 @@ function renderStats(r: BuildResult) {
   const d = derive(params);
   const rows: [string, string][] = [
     ['Body', `${(r.bbox.max[0] - r.bbox.min[0]).toFixed(2)} × ${(r.bbox.max[1] - r.bbox.min[1]).toFixed(2)} × ${(r.bbox.max[2] - r.bbox.min[2]).toFixed(2)} mm`],
+    ['Card stack', `${d.card_t.toFixed(2)} mm${params.card_mode === 'count' ? ` (${params.card_count} × ${params.card_unit})` : ` (≈ ${(d.card_t / params.card_unit).toFixed(1)} cards)`}`],
     ['Card section', `${d.T_card.toFixed(2)} mm thick`],
+    ['Ridge height', `${d.ridge_h.toFixed(2)} mm${params.ridge_auto ? ' (auto)' : ''}`],
     ['Case volume', `${r.caseMesh.volume.toFixed(1)} mm³`],
   ];
   if (r.logoMesh && r.logo) {
