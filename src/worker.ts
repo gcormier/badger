@@ -14,12 +14,14 @@ export type LogoSource =
 
 export type WorkerRequest =
   | { type: 'source'; source: LogoSource | null }
-  | { type: 'build'; id: number; params: Params };
+  | { type: 'build'; id: number; params: Params }
+  | { type: 'exportLogo'; id: number; params: Params };
 
 export type WorkerResponse =
   | { type: 'ready' }
   | { type: 'result'; id: number; result: BuildResult; sourceWarnings: string[]; threshold: number | null }
-  | { type: 'error'; id: number; message: string };
+  | { type: 'error'; id: number; message: string }
+  | { type: 'logo'; id: number; name: string; svg: string | null };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 let wasm: ManifoldToplevel | null = null;
@@ -63,6 +65,17 @@ ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     traceCache = null;
     return;
   }
+  if (msg.type === 'exportLogo') {
+    let svg: string | null = null;
+    if (source?.kind === 'svg') svg = source.text;
+    else if (source?.kind === 'image') {
+      const li = logoInput(msg.params);
+      if (li.input?.kind === 'raster') svg = contoursToSvg(li.input.contours, li.input.width, li.input.height);
+    }
+    const name = source ? (source.kind === 'image' ? source.name.replace(/\.[^.]+$/, '') + '.svg' : source.name) : '';
+    ctx.postMessage({ type: 'logo', id: msg.id, name, svg } satisfies WorkerResponse);
+    return;
+  }
   if (msg.type === 'build') {
     try {
       const li = logoInput(msg.params);
@@ -75,3 +88,15 @@ ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     }
   }
 };
+
+/** Traced raster contours as a compact SVG (pixel units, 0.1 px precision). */
+function contoursToSvg(contours: [number, number][][], width: number, height: number): string {
+  const f = (v: number) => (Math.round(v * 10) / 10).toString();
+  let d = '';
+  for (const c of contours) {
+    d += 'M' + f(c[0][0]) + ' ' + f(c[0][1]);
+    for (let i = 1; i < c.length; i++) d += 'L' + f(c[i][0]) + ' ' + f(c[i][1]);
+    d += 'Z';
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"><path fill-rule="evenodd" d="${d}"/></svg>`;
+}

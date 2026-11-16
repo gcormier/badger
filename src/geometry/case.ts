@@ -2,6 +2,7 @@
 import type { ManifoldToplevel, Manifold, CrossSection } from 'manifold-3d';
 import { CaseParams, Derived, derive } from '../params';
 import { Scope } from './scope';
+import { filletTop, chamferBottom, mouthFlare } from './edges';
 
 const E = 0.01;
 const T30 = Math.tan(Math.PI / 6);
@@ -84,6 +85,22 @@ export function buildCase(w: ManifoldToplevel, p: CaseParams, s: Scope): Manifol
   // Thumb notch and lanyard slot.
   body = s.k(body.subtract(s.k(s.k(Manifold.cylinder(20, p.notch_r, p.notch_r, 128)).translate([0, d.card_cy, -5]))));
   body = s.k(body.subtract(lanyardBox(w, s, p, d)));
+
+  // ---- edge treatment ----
+  // Pocket mouths: rounded lead-ins (card enters at x = 0, key at x = W).
+  const cardMouth = mouthFlare(w, s, 0, -1, p.mouth_r, d.key_sec - o, d.key_sec + d.card_ph + o, sk, d.T_card + 1, { y0: true, y1: true, z0: true });
+  if (cardMouth) body = s.k(body.subtract(cardMouth));
+  const keyMouth = mouthFlare(w, s, W, 1, p.mouth_r, y0k, y1k, sk, sk + d.key_gap, { y0: true, y1: true, z0: true, z1: true });
+  if (keyMouth) body = s.k(body.subtract(keyMouth));
+  // Top-face fillets, per section (they can have different heights).
+  if (p.fillet_r > 0) {
+    const r = Math.min(p.fillet_r, sk);
+    const keyRegion = rect2(w, s, -10, -10, W + 10, d.key_sec);
+    const cardRegion = rect2(w, s, -10, d.key_sec, W + 10, H + 10);
+    body = filletTop(w, s, body, keyRegion, d.T_key, r);
+    body = filletTop(w, s, body, cardRegion, d.T_card, r);
+  }
+  body = chamferBottom(w, s, body, Math.min(p.bed_chamfer, sk / 2));
 
   return s.release(body);
 }

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { getWasm, read3mf, toManifold } from './util';
 import { buildCase } from '../src/geometry/case';
-import { DEFAULT_CASE, LEGACY_RETENTION, derive, CaseParams } from '../src/params';
+import { DEFAULT_CASE, LEGACY_RETENTION, SHARP_EDGES, derive, CaseParams } from '../src/params';
 
-const LEG: CaseParams = { ...DEFAULT_CASE, ...LEGACY_RETENTION };
+const LEG: CaseParams = { ...DEFAULT_CASE, ...LEGACY_RETENTION, ...SHARP_EDGES };
 import { Scope } from '../src/geometry/scope';
 
 describe('case', () => {
@@ -68,7 +68,7 @@ describe('case', () => {
       }
     });
     it('45° lip overhangs the front card above it', () => {
-      const zt = d.T_card - 0.05;
+      const zt = d.T_card - p.fillet_r - 0.05; // below the top fillet
       const over = zt - d.z_front - 0.05; // lip reach at that height
       expect(solidFrac(edgeX - over + 0.02, ym, zt - 0.02, edgeX - 0.02, ym + 1, zt)).toBeGreaterThan(0.999);
       expect(solidFrac(xm, d.key_sec + 0.02, zt - 0.02, xm + 1, d.key_sec + over - 0.02, zt)).toBeGreaterThan(0.999);

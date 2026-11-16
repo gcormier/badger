@@ -4,7 +4,7 @@ import { unzipSync, strFromU8 } from 'fflate';
 import { getWasm, read3mf, toManifold } from './util';
 import { parseSvg } from '../src/geometry/svg';
 import { runBuild } from '../src/geometry/pipeline';
-import { DEFAULTS, LEGACY_RETENTION } from '../src/params';
+import { DEFAULTS, LEGACY_RETENTION, SHARP_EDGES } from '../src/params';
 import { Scope } from '../src/geometry/scope';
 import { build3MF } from '../src/export/threemf';
 
@@ -12,7 +12,7 @@ const svg = parseSvg(readFileSync('fixtures/Milwaukee_Logo.svg', 'utf8'));
 
 describe('Milwaukee inlay (acceptance 2–4)', async () => {
   const w = await getWasm();
-  const p = { ...DEFAULTS, ...LEGACY_RETENTION, card_t: 2.76 };
+  const p = { ...DEFAULTS, ...LEGACY_RETENTION, ...SHARP_EDGES, card_t: 2.76 };
   const r = runBuild(w, p, { kind: 'svg', shapes: svg.shapes });
 
   it('meshes are manifold', () => {
@@ -76,7 +76,7 @@ describe('Milwaukee inlay (acceptance 2–4)', async () => {
 describe('no logo', async () => {
   it('builds plain case', async () => {
     const w = await getWasm();
-    const r = runBuild(w, { ...DEFAULTS, ...LEGACY_RETENTION, card_t: 2.0 }, null);
+    const r = runBuild(w, { ...DEFAULTS, ...LEGACY_RETENTION, ...SHARP_EDGES, card_t: 2.0 }, null);
     expect(r.logoMesh).toBeNull();
     expect(r.bbox.max[2]).toBeCloseTo(5.8, 4);
   });

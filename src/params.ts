@@ -50,6 +50,12 @@ export interface CaseParams {
   grip_l: number;
   grip_off: number;
   corner_r: number;
+  /** fillet radius on top-face edges (outline, openings, lips, section step) */
+  fillet_r: number;
+  /** rounded lead-in at the card and key pocket mouths */
+  mouth_r: number;
+  /** 45° chamfer on bed-face edges (also hides elephant's foot) */
+  bed_chamfer: number;
 }
 
 export interface LogoParams {
@@ -115,6 +121,9 @@ export const DEFAULT_CASE: CaseParams = {
   grip_l: 10,
   grip_off: 28,
   corner_r: 2,
+  fillet_r: 0.6,
+  mouth_r: 0.6,
+  bed_chamfer: 0.4,
 };
 
 export const DEFAULT_LOGO: LogoParams = {
@@ -136,6 +145,9 @@ export const DEFAULT_LOGO: LogoParams = {
 };
 
 export const DEFAULTS: Params = { ...DEFAULT_CASE, ...DEFAULT_LOGO };
+
+/** No edge treatment — the Fusion model's sharp edges. */
+export const SHARP_EDGES: Partial<CaseParams> = { fillet_r: 0, mouth_r: 0, bed_chamfer: 0 };
 
 /** The original Fusion gen1 card retention (full-height dovetail, fixed 1.4 mm ridges). */
 export const LEGACY_RETENTION: Partial<CaseParams> = {
@@ -271,6 +283,9 @@ export const FIELDS: FieldMeta[] = [
   { key: 'notch_r', label: 'Thumb notch radius', unit: 'mm', step: 0.5, group: 'case' },
   { key: 'grip_off', label: 'Pinch window offset', unit: 'mm', step: 0.5, group: 'case' },
   { key: 'corner_r', label: 'Corner radius', unit: 'mm', step: 0.1, group: 'case' },
+  { key: 'fillet_r', label: 'Top edge fillet', unit: 'mm', step: 0.1, min: 0, max: 1.2, group: 'case', help: '0 = sharp' },
+  { key: 'mouth_r', label: 'Pocket mouth rounding', unit: 'mm', step: 0.1, min: 0, max: 1.5, group: 'case' },
+  { key: 'bed_chamfer', label: 'Bed edge chamfer', unit: 'mm', step: 0.1, min: 0, max: 1, group: 'case', help: '45°, no overhang' },
 
   { key: 'logo_length', label: 'Logo length (long axis)', unit: 'mm', step: 0.5, min: 1, max: 120, star: true, group: 'logo' },
   { key: 'logo_rotation', label: 'Logo rotation', unit: '°', step: 90, min: -360, max: 360, star: true, group: 'logo', help: '90 = text runs up the long axis' },

@@ -4,6 +4,7 @@ import { Viewer, ViewName } from './viewer';
 import { build3MF } from './export/threemf';
 import type { WorkerRequest, WorkerResponse, LogoSource } from './worker';
 import type { BuildResult } from './geometry/pipeline';
+import { encodeShare, decodeShare, paramDiff } from './share';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const STORE = 'badger.params.v1';
@@ -31,9 +32,18 @@ function saveParams() {
 // ---------- worker ----------
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 const send = (m: WorkerRequest) => worker.postMessage(m);
+type LogoMsg = Extract<WorkerResponse, { type: 'logo' }>;
+const logoWaiters = new Map<number, (m: LogoMsg) => void>();
+let logoReq = 0;
+const exportLogo = () => new Promise<LogoMsg>((res) => {
+  const id = ++logoReq;
+  logoWaiters.set(id, res);
+  send({ type: 'exportLogo', id, params });
+});
 worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
   const m = ev.data;
   if (m.type === 'ready') return;
+  if (m.type === 'logo') { logoWaiters.get(m.id)?.(m); logoWaiters.delete(m.id); return; }
   if (m.id !== buildId) return; // stale
   $('busy').hidden = true;
   if (m.type === 'error') {
@@ -290,4 +300,42 @@ $('download').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
 
+// ---------- share links ----------
+const SHARE_WARN = 8000;
+$('share').addEventListener('click', async () => {
+  const msg = $('share-msg');
+  const logo = await exportLogo();
+  const p = { ...params };
+  // a traced PNG is shared as its outline: threshold/invert no longer apply
+  if (source?.kind === 'image') { p.threshold = null; p.invert = false; }
+  const enc = encodeShare({ params: paramDiff(p), logo: logo.svg ? { name: logo.name, svg: logo.svg } : undefined });
+  const url = `${location.origin}${location.pathname}#s=${enc}`;
+  let copied = false;
+  try { await navigator.clipboard.writeText(url); copied = true; } catch { /* insecure context etc. */ }
+  const kb = (url.length / 1024).toFixed(1);
+  msg.hidden = false;
+  msg.textContent = (copied ? `Link copied (${kb} KB)` : `Copy this link (${kb} KB):`) +
+    (url.length > SHARE_WARN ? ' — long; some chat apps may truncate it' : '') +
+    (source?.kind === 'image' ? ' · PNG shared as its traced outline' : '');
+  const box = document.createElement('input');
+  box.readOnly = true; box.value = url;
+  box.addEventListener('focus', () => box.select());
+  msg.appendChild(box);
+});
+
+function loadFromHash(): boolean {
+  const m = location.hash.match(/^#s=([\w-]+)$/);
+  if (!m) return false;
+  const dec = decodeShare(m[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+  if (!dec) { renderWarnings([], 'This share link is damaged or from an incompatible version'); return false; }
+  params = { ...DEFAULTS, ...dec.params };
+  saveParams();
+  renderForm();
+  if (dec.logo) setSource({ kind: 'svg', name: dec.logo.name, text: dec.logo.svg });
+  return true;
+}
+window.addEventListener('hashchange', () => { if (loadFromHash()) rebuild(0); });
+
+loadFromHash();
 rebuild(0);

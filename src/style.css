@@ -93,6 +93,12 @@ button { font: inherit; cursor: pointer; }
   width: 100%; padding: 10px; border-radius: 8px; border: none; background: var(--accent); color: var(--accent-text); font-weight: 600;
 }
 .primary:disabled { opacity: .5; cursor: default; }
+.secondary {
+  width: 100%; padding: 8px; margin-top: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-weight: 500;
+}
+.secondary:hover { border-color: var(--accent); }
+.share-msg { font-size: 12px; color: var(--muted); margin: 6px 0 0; word-break: break-all; }
+.share-msg input { width: 100%; font: inherit; font-size: 11px; padding: 4px; margin-top: 4px; background: var(--input-bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; }
 
 .warnings { list-style: none; padding: 0; margin: 10px 0 0; }
 .warnings li { background: var(--warn-bg); color: var(--warn-text); border-radius: 6px; padding: 6px 8px; margin: 4px 0; font-size: 12px; }
